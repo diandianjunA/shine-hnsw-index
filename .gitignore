@@ -1,0 +1,11 @@
+*.gch
+*.o
+*.out
+*.cmake
+build/
+cmake-build-*/
+.DS_Store
+.cache
+.idea
+__pycache__
+mongodb.py
