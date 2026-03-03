@@ -70,7 +70,7 @@ public:
   BufferAllocator& buffer_allocator;  // global per compute node
   cache::Cache& cache;  // global per compute node
 
-  SharedContext<ComputeThread>* ctx{nullptr};  // initialized by WorkerPool
+  SharedContext<ComputeThread, false>* ctx{nullptr};  // initialized by WorkerPool
   u32 ctx_tid{};
 
   // stores the k-NNs (node ids) of this thread's processed queries (for recall computation)

@@ -317,7 +317,7 @@ private:
   vec<Bucket> cache_;
   CoolingTable cooling_table_;
 
-  HugePage<byte_t> cache_entries_buffer_;
+  HugePage<byte_t, false> cache_entries_buffer_;
   vec<CacheEntry*> cache_entries_;
   std::atomic<idx_t> cache_entry_idx_{0};
 

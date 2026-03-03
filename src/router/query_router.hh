@@ -405,7 +405,7 @@ private:
   size_t received_mn_terminations_{0};
   size_t received_cn_terminations_{0};  // we will overall receive CN x MN many
 
-  HugePage<byte_t> buffer_;
+  HugePage<byte_t, false> buffer_;
   QPs& qps_;
   vec<idx_t> freelist_;
   LocalMemoryRegion lmr_;

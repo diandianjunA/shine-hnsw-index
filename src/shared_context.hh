@@ -3,12 +3,12 @@
 #include <library/connection_manager.hh>
 #include <library/detached_qp.hh>
 
-template <typename T>
+template <typename T, bool HUGE_1GB = true>
 class SharedContext {
 public:
   SharedContext(Context& channel_context,
                 ClientConnectionManager& cm,
-                HugePage<byte_t>& buffer,
+                HugePage<byte_t, HUGE_1GB>& buffer,
                 const MemoryRegionTokens& remote_mrts)
       : context(channel_context.get_config()), remote_mrts(remote_mrts) {
     qps.reserve(cm.server_qps.size());

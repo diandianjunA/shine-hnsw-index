@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.10)
 
-set(IBVerbs_DIR .)
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 
 # required packages

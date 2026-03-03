@@ -4,9 +4,12 @@
 #include "hnsw/distance.hh"
 #include "io/read_data.hh"
 
+using json = nlohmann::json;
+
 template <class Distance>
 ComputeNode<Distance>::ComputeNode(Configuration& config)
     : context_(config), cm_(context_, config), num_servers_(config.num_server_nodes()) {
+  std::cerr << "[DEBUG] ComputeNode HTTP impl constructor started, enable_http=" << config.enable_http << std::endl;
   init_remote_tokens();
   cm_.connect();
 
@@ -30,14 +33,24 @@ ComputeNode<Distance>::ComputeNode(Configuration& config)
   t_query_ = timing_.create_enroll("query_c0");
 
   receive_remote_access_tokens();
+
   const bool compute_recall = not config.no_recall;
-  read_dataset(config.data_path, config.query_suffix, config.load_index, compute_recall, config.use_cache);
+  
+  // Read dataset only if not in HTTP mode or loading index
+  if (!config.enable_http || config.load_index) {
+    read_dataset(config.data_path, config.query_suffix, config.load_index, compute_recall, config.use_cache);
+  }
 
   const u32 seed = config.seed == -1 ? std::random_device{}() : config.seed + cm_.client_id;
+  
+  // Determine dimension - if in HTTP mode and no dataset, use default 128
+  u32 dim = config.enable_http && database_.dim == 0 ? 128 : database_.dim;
+  
   hnsw::HNSW<Distance> hnsw{
-    config.m, config.ef_construction, config.k, config.ef_search, seed, database_.dim, config.use_cache};
+    config.m, config.ef_construction, config.k, config.ef_search, seed, dim, config.use_cache};
 
-  const size_t estimated_index_size = hnsw.estimate_index_size(database_.num_vectors_total);
+  const size_t num_vectors_estimate = config.enable_http ? 1000000 : database_.num_vectors_total;
+  const size_t estimated_index_size = hnsw.estimate_index_size(num_vectors_estimate);
   statistics_.add_static_stat("estimated_total_index_size", estimated_index_size);
 
   const size_t cache_size = static_cast<f32>(estimated_index_size) / 100. * config.cache_size_ratio;
@@ -51,14 +64,16 @@ ComputeNode<Distance>::ComputeNode(Configuration& config)
   // - initialize cache and worker pool -
   // ------------------------------------
 
-  const size_t num_cache_buckets = cache_size / Node::size_until_components();
-  const size_t num_cooling_table_buckets = std::ceil(cache_size / Node::size_until_components() /
-                                                     cache::COOLING_TABLE_BUCKET_ENTRIES * cache::COOLING_TABLE_RATIO);
+  const size_t effective_cache_size = config.use_cache ? cache_size : 0;
+  const size_t num_cache_buckets = effective_cache_size > 0 ? effective_cache_size / Node::size_until_components() : 1;
+  const size_t num_cooling_table_buckets = effective_cache_size > 0 
+      ? std::ceil(effective_cache_size / Node::size_until_components() / cache::COOLING_TABLE_BUCKET_ENTRIES * cache::COOLING_TABLE_RATIO)
+      : 1;
 
   print_status("allocate worker threads and read buffers");
   WorkerPool worker_pool{config.num_threads,
                          config.max_send_queue_wr,
-                         cache_size,
+                         effective_cache_size,
                          num_cache_buckets,
                          num_cooling_table_buckets,
                          config.use_cache};
@@ -75,6 +90,23 @@ ComputeNode<Distance>::ComputeNode(Configuration& config)
 
   cm_.synchronize();  // notify memory nodes that this compute node is ready
 
+  std::cerr << "[DEBUG] Before enable_http check, enable_http=" << config.enable_http << std::endl;
+  if (config.enable_http) {
+    // HTTP service mode
+    run_http_service_mode(config, hnsw, worker_pool);
+  } else {
+    // Original benchmark mode
+    Placement<Distance> placement{cm_.num_total_clients, worker_pool.get_compute_threads().front(), timing_};
+    run_benchmark_mode(config, hnsw, worker_pool, compute_recall, placement);
+  }
+}
+
+template <class Distance>
+void ComputeNode<Distance>::run_benchmark_mode(Configuration& config,
+                                                hnsw::HNSW<Distance>& hnsw,
+                                                WorkerPool& worker_pool,
+                                                const bool compute_recall,
+                                                const Placement<Distance>& placement) {
   // construct the index
   if (!config.load_index) {
     run_inserts(hnsw, worker_pool, config.num_coroutines, !config.disable_thread_pinning);
@@ -105,9 +137,6 @@ ComputeNode<Distance>::ComputeNode(Configuration& config)
   for (const auto& thread : worker_pool.get_compute_threads()) {
     thread->reset();
   }
-
-  print_status("construct placement datastructure");
-  const Placement<Distance> placement{cm_.num_total_clients, worker_pool.get_compute_threads().front(), timing_};
 
   // ----------------
   // - cache warmup -
@@ -184,6 +213,51 @@ ComputeNode<Distance>::ComputeNode(Configuration& config)
 
   } else {
     std::cerr << timing_ << std::endl;
+  }
+}
+
+template <class Distance>
+void ComputeNode<Distance>::run_http_service_mode(Configuration& config,
+                                                   hnsw::HNSW<Distance>& hnsw,
+                                                   WorkerPool& worker_pool) {
+  std::cerr << "[DEBUG] run_http_service_mode started" << std::endl;
+  print_status("Running in HTTP service mode");
+  
+  // Initialize HTTP server if we're the initiator
+  if (cm_.is_initiator) {
+    std::cerr << "[DEBUG] Creating HTTP server" << std::endl;
+    http_server_ = std::make_unique<http_server::HttpServer>(config.http_host, config.http_port);
+    std::cerr << "[DEBUG] Starting HTTP server" << std::endl;
+    http_server_->start();
+    print_status("HTTP server started on " + config.http_host + ":" + std::to_string(config.http_port));
+    
+    // Load index if specified
+    if (config.load_index) {
+      print_status("Loading index from file");
+      wait_for_load_or_store(config);
+      sync_compute_nodes();
+    }
+    
+    // Run the HTTP service loop
+    run_http_service(hnsw, worker_pool, config.num_coroutines, !config.disable_thread_pinning);
+    
+    // Cleanup
+    http_server_->stop();
+    terminate();
+  } else {
+    // Non-initiator compute nodes just wait
+    print_status("Non-initiator compute node waiting in HTTP mode");
+    if (config.load_index) {
+      wait_for_load_or_store(config);
+      sync_compute_nodes();
+    }
+    
+    // Wait for termination signal
+    while (true) {
+      std::this_thread::sleep_for(std::chrono::seconds(1));
+      // In a real implementation, we'd have a way to signal termination
+      // For now, we just keep this node alive
+    }
   }
 }
 
@@ -597,6 +671,106 @@ f64 ComputeNode<Distance>::compute_local_recall(const ComputeThreads& compute_th
 
   const f64 recall = true_results / static_cast<f64>(processed_queries) / k;
   return recall;
+}
+
+template <class Distance>
+void ComputeNode<Distance>::run_http_service(hnsw::HNSW<Distance>& hnsw,
+                                             WorkerPool& worker_pool,
+                                             u32 num_coroutines,
+                                             bool pin_threads) {
+  print_status("Starting HTTP service mode");
+  
+  while (http_server_->is_running()) {
+    auto task_opt = http_server_->get_next_task();
+    if (!task_opt) {
+      break;
+    }
+    
+    auto& task = *task_opt;
+    if (task.type == http_server::RequestTask::INSERT) {
+      process_http_insert(task.insert_req, task.promise, hnsw, worker_pool, num_coroutines, pin_threads);
+    } else if (task.type == http_server::RequestTask::QUERY) {
+      process_http_query(task.query_req, task.promise, hnsw, worker_pool, num_coroutines, pin_threads);
+    }
+  }
+  
+  print_status("HTTP service stopped");
+}
+
+template <class Distance>
+void ComputeNode<Distance>::process_http_insert(const http_server::InsertRequest& req,
+                                                std::promise<nlohmann::json>& promise,
+                                                hnsw::HNSW<Distance>& hnsw,
+                                                WorkerPool& worker_pool,
+                                                u32 num_coroutines,
+                                                bool pin_threads) {
+  try {
+    node_t id = req.id;
+    if (id == static_cast<node_t>(-1)) {
+      id = next_http_insert_id_.fetch_add(1);
+    }
+    
+    auto& thread = worker_pool.get_compute_threads()[0];
+    auto coro = hnsw.insert(id, std::span<element_t>(const_cast<element_t*>(req.vector.data()), req.vector.size()), thread);
+    
+    while (!coro.handle.done()) {
+      coro.handle.resume();
+    }
+    
+    json response = {
+      {"success", true},
+      {"id", id},
+      {"message", "Vector inserted successfully"}
+    };
+    http_server_->submit_response(promise, response);
+  } catch (const std::exception& e) {
+    json response = {
+      {"success", false},
+      {"error", e.what()}
+    };
+    http_server_->submit_response(promise, response);
+  }
+}
+
+template <class Distance>
+void ComputeNode<Distance>::process_http_query(const http_server::QueryRequest& req,
+                                               std::promise<nlohmann::json>& promise,
+                                               hnsw::HNSW<Distance>& hnsw,
+                                               WorkerPool& worker_pool,
+                                               u32 num_coroutines,
+                                               bool pin_threads) {
+  try {
+    auto& thread = worker_pool.get_compute_threads()[0];
+    u32 q_id = 0;
+    
+    thread->query_results.clear();
+    
+    auto coro = hnsw.knn(q_id, std::span<element_t>(const_cast<element_t*>(req.vector.data()), req.vector.size()), thread);
+
+    while (!coro.handle.done()) {
+      coro.handle.resume();
+    }
+    
+    std::vector<node_t> results;
+    auto it = thread->query_results.find(q_id);
+    if (it != thread->query_results.end()) {
+      results = it->second;
+    }
+    
+    json response = {
+      {"success", true},
+      {"results", results},
+      {"k", req.k},
+      {"ef_search", req.ef_search}
+    };
+    http_server_->submit_response(promise, response);
+  } catch (const std::exception& e) {
+    json response = {
+      {"success", false},
+      {"error", e.what()}
+    };
+    http_server_->submit_response(promise, response);
+  }
 }
 
 // explicitly initiate templates

@@ -7,6 +7,7 @@
 #include "common/statistics.hh"
 #include "common/timing.hh"
 #include "hnsw/hnsw.hh"
+#include "http_server.hh"
 #include "router/query_router.hh"
 #include "worker_pool.hh"
 
@@ -22,6 +23,8 @@ public:
   explicit ComputeNode(Configuration& config);
 
 private:
+  void run_benchmark_mode(Configuration& config, hnsw::HNSW<Distance>& hnsw, WorkerPool& worker_pool, const bool compute_recall, const Placement<Distance>& placement);
+  void run_http_service_mode(Configuration& config, hnsw::HNSW<Distance>& hnsw, WorkerPool& worker_pool);
   void run_query_router_and_queries(io::Database<element_t>& queries,
                                     WorkerPool& worker_pool,
                                     hnsw::HNSW<Distance>& hnsw,
@@ -49,6 +52,9 @@ private:
   void collect_statistics_and_timings();
   void terminate();
   f64 compute_local_recall(const ComputeThreads& compute_threads, u32 k, size_t processed_queries);
+  void run_http_service(hnsw::HNSW<Distance>& hnsw, WorkerPool& worker_pool, u32 num_coroutines, bool pin_threads);
+  void process_http_insert(const http_server::InsertRequest& req, std::promise<nlohmann::json>& promise, hnsw::HNSW<Distance>& hnsw, WorkerPool& worker_pool, u32 num_coroutines, bool pin_threads);
+  void process_http_query(const http_server::QueryRequest& req, std::promise<nlohmann::json>& promise, hnsw::HNSW<Distance>& hnsw, WorkerPool& worker_pool, u32 num_coroutines, bool pin_threads);
 
 private:
   Context context_;
@@ -72,4 +78,7 @@ private:
 
   std::atomic<idx_t> next_insert_idx_{0};
   std::atomic<idx_t> next_query_idx_{0};
+  
+  std::unique_ptr<http_server::HttpServer> http_server_;
+  std::atomic<node_t> next_http_insert_id_{0};
 };

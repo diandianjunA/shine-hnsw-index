@@ -224,7 +224,7 @@ private:
 
     const size_t buffer_entries = num_clients_ * query_router::LIMIT_PER_CN * (num_clients_ - 1) * 2;
 
-    HugePage<byte_t> routing_buffer(buffer_entries * message_size);
+    HugePage<byte_t, false> routing_buffer(buffer_entries * message_size);
     routing_buffer.touch_memory();
 
     LocalMemoryRegion lmr{
@@ -384,7 +384,7 @@ private:
   const u32 num_clients_;
   u32 num_compute_threads_{};
 
-  HugePage<byte_t> index_buffer_;
+  HugePage<byte_t, false> index_buffer_;
   MemoryRegion index_region_;
   timing::Timing timing_;
 };

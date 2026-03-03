@@ -14,7 +14,7 @@ class WorkerPool {
 public:
   using Configuration = configuration::IndexConfiguration;
   using ComputeThreads = vec<u_ptr<ComputeThread>>;
-  using SharedCtx = SharedContext<ComputeThread>;
+  using SharedCtx = SharedContext<ComputeThread, false>;
   using Queue = concurrent_queue<u32>;
 
 public:
@@ -26,7 +26,7 @@ public:
              bool use_cache)
       : num_compute_threads_(num_compute_threads),
         max_send_queue_wr_(max_send_queue_wr),
-        buffer_allocator_(num_compute_threads),
+        buffer_allocator_(num_compute_threads, use_cache),
         cache_(cache_size, num_cache_buckets, num_cooling_table_buckets, num_compute_threads, use_cache) {
     reset_barriers();  // initialize latches
   }
@@ -35,10 +35,13 @@ public:
                                ClientConnectionManager& cm,
                                MemoryRegionTokens& remote_mrts,
                                u32 num_coroutines) {
-    // create shared contexts (and QPs)
-    for (u32 i = 0; i < std::min<u32>(num_compute_threads_, MAX_QPS); ++i) {
-      shared_contexts_.emplace_back(
-        std::make_unique<SharedCtx>(context, cm, buffer_allocator_.get_raw_buffer(), remote_mrts));
+    // Only create shared contexts if cache is enabled
+    if (buffer_allocator_.use_cache()) {
+      // create shared contexts (and QPs)
+      for (u32 i = 0; i < std::min<u32>(num_compute_threads_, MAX_QPS); ++i) {
+        shared_contexts_.emplace_back(
+          std::make_unique<SharedCtx>(context, cm, buffer_allocator_.get_raw_buffer(), remote_mrts));
+      }
     }
 
     // pre-allocate worker threads
@@ -49,9 +52,12 @@ public:
     }
 
     // assign the contexts (now the thread pointers can no longer change)
-    for (u32 id = 0; id < num_compute_threads_; ++id) {
-      const auto& ctx = shared_contexts_[id % MAX_QPS];
-      ctx->register_thread(compute_threads_[id].get());
+    // Only if cache is enabled
+    if (buffer_allocator_.use_cache()) {
+      for (u32 id = 0; id < num_compute_threads_; ++id) {
+        const auto& ctx = shared_contexts_[id % MAX_QPS];
+        ctx->register_thread(compute_threads_[id].get());
+      }
     }
   }
 

@@ -1,0 +1,23 @@
+============================================================
+                        SERVER
+============================================================
+num clients:                  1
+TCP port:                     1234
+IB port:                      1
+max outstanding CQEs:         16
+max send work requests:       1024
+max receive work requests:    1024
+============================================================
+1 device(s) found
+Selected device: ibp86s0
+num_cores: 112
+physical cores per socket: 28
+hyperthreading enabled
+interleaved policy
+pairing: 127 -- 128
+[STATUS]: pinned main thread to core 28
+allocation size: 47244640256
+[STATUS]: map huge page
+allocated HUGEPAGE at 139363891544064 with buffer size 47244640256
+[STATUS]: register memory and distribute access token
+[STATUS]: connect QPs of compute threads

@@ -1,0 +1,38 @@
+============================================================
+                        CLIENT
+============================================================
+connect to:                   [localhost, ]
+is initiator:                 true
+TCP port:                     1234
+IB port:                      1
+max outstanding CQEs:         16
+max send work requests:       1024
+max receive work requests:    1024
+============================================================
+data path:                    ""
+query suffix:                 
+number of threads:            4
+number of coroutines:         4
+threads pinned:               true
+seed:                         1234
+------------------------------------------------------------
+K:                            10
+M:                            32
+ef search:                    128
+ef construction:              200
+============================================================
+1 device(s) found
+Selected device: ibp86s0
+num_cores: 112
+physical cores per socket: 28
+hyperthreading enabled
+interleaved policy
+[DEBUG] ComputeNode HTTP impl constructor started, enable_http=true
+client id: 0
+number of clients: 1
+connect to server localhost
+pairing: 128 -- 127
+[STATUS]: pinned main thread to core 28
+[STATUS]: receive access tokens of remote memory regions
+[STATUS]: allocate worker threads and read buffers
+Receive request failed

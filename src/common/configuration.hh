@@ -40,6 +40,11 @@ public:
   bool use_cache{};
   bool routing{};
 
+  // HTTP server options
+  bool enable_http{};
+  str http_host{};
+  u32 http_port{};
+
 public:
   IndexConfiguration(int argc, char** argv) {
     add_options();
@@ -82,17 +87,25 @@ private:
       "ef-search", po::value<u32>(&ef_search), "Beam width during search.")(
       "ef-construction", po::value<u32>(&ef_construction)->default_value(200), "Beam width during construction.")(
       "k,k", po::value<u32>(&k), "Number of k nearest neighbors.")(
-      "m,m", po::value<u32>(&m)->default_value(32), "Number of bidirectional connections in the HNSW graph.");
+      "m,m", po::value<u32>(&m)->default_value(32), "Number of bidirectional connections in the HNSW graph.")(
+      "enable-http", po::bool_switch(&enable_http)->default_value(false), "Enable HTTP server for API access.")(
+      "http-host", po::value<str>(&http_host)->default_value("0.0.0.0"), "Host address for HTTP server.")(
+      "http-port", po::value<u32>(&http_port)->default_value(8080), "Port for HTTP server.");
   }
 
   void validate_compute_node_options(char** argv) const {
-    if (data_path.empty() || query_suffix.empty()) {
-      std::cerr << "[ERROR]: Data path and query suffix cannot be empty" << std::endl;
+    if (!enable_http && (data_path.empty() || query_suffix.empty())) {
+      std::cerr << "[ERROR]: Data path and query suffix cannot be empty when HTTP is not enabled" << std::endl;
       exit_with_help_message(argv);
     }
 
-    if (num_threads == 0 || ef_search == 0 || k == 0) {
-      std::cerr << "[ERROR]: Parameters threads, ef-search, and k are required" << std::endl;
+    if (num_threads == 0 || ef_search == 0) {
+      std::cerr << "[ERROR]: Parameters threads and ef-search are required" << std::endl;
+      exit_with_help_message(argv);
+    }
+
+    if (!enable_http && k == 0) {
+      std::cerr << "[ERROR]: Parameter k is required when HTTP is not enabled" << std::endl;
       exit_with_help_message(argv);
     }
 
