@@ -1,7 +1,7 @@
 ============================================================
                         CLIENT
 ============================================================
-connect to:                   [localhost, ]
+connect to:                   [cluster1, ]
 is initiator:                 true
 TCP port:                     1234
 IB port:                      1
@@ -30,30 +30,30 @@ interleaved policy
 [DEBUG] ComputeNode HTTP impl constructor started, enable_http=true
 client id: 0
 number of clients: 1
-connect to server localhost
-pairing: 223 -- 222
+connect to server cluster1
+pairing: 233 -- 40
 [STATUS]: pinned main thread to core 28
 [STATUS]: receive access tokens of remote memory regions
 [STATUS]: max cache size: 52619353
 [STATUS]: allocate worker threads and read buffers
 [STATUS]: map huge page
-allocated HUGEPAGE at 125600150847488 with buffer size 10737418240
+allocated HUGEPAGE at 133691395276800 with buffer size 10737418240
 num cache buckets: 99657
 allocate cache entries hugepage of size 3986280
 [STATUS]: map huge page
-allocated HUGEPAGE at 125600142458880 with buffer size 3986280
+allocated HUGEPAGE at 133691386888192 with buffer size 3986280
 1 device(s) found
 Selected device: ibp86s0
-pairing: 225 -- 224
+pairing: 234 -- 41
 1 device(s) found
 Selected device: ibp86s0
-pairing: 227 -- 226
+pairing: 235 -- 42
 1 device(s) found
 Selected device: ibp86s0
-pairing: 229 -- 228
+pairing: 236 -- 43
 1 device(s) found
 Selected device: ibp86s0
-pairing: 231 -- 230
+pairing: 237 -- 44
 [DEBUG] Before enable_http check, enable_http=true
 [DEBUG] run_http_service_mode started
 [STATUS]: Running in HTTP service mode
