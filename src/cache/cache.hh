@@ -78,7 +78,7 @@ public:
     for (const auto& bucket : cache_) {
       auto entry = bucket.head_entry;
       while (entry.get()) {
-        if (entry.get()->value.load()) {
+        if (entry.get()->value.load(std::memory_order_acquire)) {
           size += Node::size_until_components();
           ++nodes;
 

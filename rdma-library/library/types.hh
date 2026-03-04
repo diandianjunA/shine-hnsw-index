@@ -1,8 +1,8 @@
 #ifndef RDMA_LIBRARY_TYPES_HH
 #define RDMA_LIBRARY_TYPES_HH
 
-#include <oneapi/tbb/concurrent_queue.h>
-#include <oneapi/tbb/concurrent_vector.h>
+#include <tbb/concurrent_queue.h>
+#include <tbb/concurrent_vector.h>
 
 #include <cstdint>
 #include <functional>
@@ -51,7 +51,7 @@ template <typename T>
 using span = std::span<T>;
 
 template <typename T>
-using concurrent_vec = oneapi::tbb::concurrent_vector<T>;
+using concurrent_vec = tbb::concurrent_vector<T>;
 
 template <typename T>
 using concurrent_queue = moodycamel::ConcurrentQueue<T>;
