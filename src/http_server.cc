@@ -47,6 +47,13 @@ void HttpServer::setup_routes() {
 
 void HttpServer::handle_insert(const httplib::Request& req, httplib::Response& res) {
   try {
+    if (queue_size_.load() >= MAX_QUEUE_SIZE) {
+      json error = {{"success", false}, {"error", "Server busy, please try again later"}};
+      res.set_content(error.dump(), "application/json");
+      res.status = 503;
+      return;
+    }
+
     json body = json::parse(req.body);
     InsertRequest insert_req;
     insert_req.vector = body["vector"].get<std::vector<element_t>>();
@@ -60,6 +67,7 @@ void HttpServer::handle_insert(const httplib::Request& req, httplib::Response& r
     {
       std::lock_guard<std::mutex> lock(queue_mutex_);
       task_queue_.push(std::move(task));
+      queue_size_++;
     }
     queue_cv_.notify_one();
 
@@ -75,6 +83,13 @@ void HttpServer::handle_insert(const httplib::Request& req, httplib::Response& r
 
 void HttpServer::handle_query(const httplib::Request& req, httplib::Response& res) {
   try {
+    if (queue_size_.load() >= MAX_QUEUE_SIZE) {
+      json error = {{"success", false}, {"error", "Server busy, please try again later"}};
+      res.set_content(error.dump(), "application/json");
+      res.status = 503;
+      return;
+    }
+
     json body = json::parse(req.body);
     QueryRequest query_req;
     query_req.vector = body["vector"].get<std::vector<element_t>>();
@@ -89,6 +104,7 @@ void HttpServer::handle_query(const httplib::Request& req, httplib::Response& re
     {
       std::lock_guard<std::mutex> lock(queue_mutex_);
       task_queue_.push(std::move(task));
+      queue_size_++;
     }
     queue_cv_.notify_one();
 
@@ -103,7 +119,7 @@ void HttpServer::handle_query(const httplib::Request& req, httplib::Response& re
 }
 
 void HttpServer::handle_health(const httplib::Request&, httplib::Response& res) {
-  json response = {{"status", "ok"}, {"running", running_.load()}};
+  json response = {{"status", "ok"}, {"running", running_.load()}, {"success", true}};
   res.set_content(response.dump(), "application/json");
   res.status = 200;
 }
@@ -162,6 +178,7 @@ std::optional<RequestTask> HttpServer::get_next_task() {
 
   RequestTask task = std::move(task_queue_.front());
   task_queue_.pop();
+  queue_size_--;
   return task;
 }
 

@@ -20,7 +20,7 @@ ComputeNode<Distance>::ComputeNode(Configuration& config)
   }
 
   if (cm_.is_initiator) {  // communicate parameters to the memory nodes
-    configuration::Parameters p{config.num_threads, config.use_cache, config.routing};
+    configuration::Parameters p{config.num_threads, config.enable_http ? false : config.use_cache, config.routing};
 
     for (const QP& qp : cm_.server_qps) {
       qp->post_send_inlined(&p, sizeof(configuration::Parameters), IBV_WR_SEND);
@@ -710,11 +710,35 @@ void ComputeNode<Distance>::process_http_insert(const http_server::InsertRequest
       id = next_http_insert_id_.fetch_add(1);
     }
     
-    auto& thread = worker_pool.get_compute_threads()[0];
-    auto coro = hnsw.insert(id, std::span<element_t>(const_cast<element_t*>(req.vector.data()), req.vector.size()), thread);
+    auto& compute_threads = worker_pool.get_compute_threads();
+    u32 num_threads = compute_threads.size();
+    u32 worker_id = next_worker_id_.fetch_add(1) % num_threads;
+    auto& thread = compute_threads[worker_id];
     
-    while (!coro.handle.done()) {
-      coro.handle.resume();
+    const u32 coroutine_id = 0;
+    
+    thread->reset();
+    thread->post_balances[coroutine_id] = 0;
+    thread->coroutines.clear();
+    thread->coroutines.emplace_back(std::make_unique<HNSWCoroutine>(hnsw.insert(id, std::span<element_t>(const_cast<element_t*>(req.vector.data()), req.vector.size()), thread)));
+    
+    for (;;) {
+      bool all_done = true;
+      thread->poll_cq();
+      
+      auto& coroutine = *thread->coroutines[coroutine_id];
+      if (coroutine.handle.done()) {
+      } else if (thread->is_ready(coroutine_id)) {
+        all_done = false;
+        thread->set_current_coroutine(coroutine_id);
+        coroutine.handle.resume();
+      } else {
+        all_done = false;
+      }
+      
+      if (all_done && coroutine.handle.done()) {
+        break;
+      }
     }
     
     json response = {
@@ -740,15 +764,37 @@ void ComputeNode<Distance>::process_http_query(const http_server::QueryRequest& 
                                                u32 num_coroutines,
                                                bool pin_threads) {
   try {
-    auto& thread = worker_pool.get_compute_threads()[0];
+    auto& compute_threads = worker_pool.get_compute_threads();
+    u32 num_threads = compute_threads.size();
+    u32 worker_id = next_worker_id_.fetch_add(1) % num_threads;
+    auto& thread = compute_threads[worker_id];
     u32 q_id = 0;
     
-    thread->query_results.clear();
+    const u32 coroutine_id = 0;
     
-    auto coro = hnsw.knn(q_id, std::span<element_t>(const_cast<element_t*>(req.vector.data()), req.vector.size()), thread);
-
-    while (!coro.handle.done()) {
-      coro.handle.resume();
+    thread->reset();
+    thread->post_balances[coroutine_id] = 0;
+    thread->query_results.clear();
+    thread->coroutines.clear();
+    thread->coroutines.emplace_back(std::make_unique<HNSWCoroutine>(hnsw.knn(q_id, std::span<element_t>(const_cast<element_t*>(req.vector.data()), req.vector.size()), thread)));
+    
+    for (;;) {
+      bool all_done = true;
+      thread->poll_cq();
+      
+      auto& coroutine = *thread->coroutines[coroutine_id];
+      if (coroutine.handle.done()) {
+      } else if (thread->is_ready(coroutine_id)) {
+        all_done = false;
+        thread->set_current_coroutine(coroutine_id);
+        coroutine.handle.resume();
+      } else {
+        all_done = false;
+      }
+      
+      if (all_done && coroutine.handle.done()) {
+        break;
+      }
     }
     
     std::vector<node_t> results;

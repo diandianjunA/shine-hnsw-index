@@ -14,10 +14,15 @@ num_cores: 112
 physical cores per socket: 28
 hyperthreading enabled
 interleaved policy
-pairing: 127 -- 128
+pairing: 222 -- 223
 [STATUS]: pinned main thread to core 28
-allocation size: 47244640256
+allocation size: 42949672960
 [STATUS]: map huge page
-allocated HUGEPAGE at 139363891544064 with buffer size 47244640256
+allocated HUGEPAGE at 129264785555456 with buffer size 42949672960
 [STATUS]: register memory and distribute access token
 [STATUS]: connect QPs of compute threads
+pairing: 224 -- 225
+pairing: 226 -- 227
+pairing: 228 -- 229
+pairing: 230 -- 231
+[STATUS]: idle: index construction

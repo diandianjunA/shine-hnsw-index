@@ -31,8 +31,34 @@ interleaved policy
 client id: 0
 number of clients: 1
 connect to server localhost
-pairing: 128 -- 127
+pairing: 223 -- 222
 [STATUS]: pinned main thread to core 28
 [STATUS]: receive access tokens of remote memory regions
+[STATUS]: max cache size: 52619353
 [STATUS]: allocate worker threads and read buffers
-Receive request failed
+[STATUS]: map huge page
+allocated HUGEPAGE at 125600150847488 with buffer size 10737418240
+num cache buckets: 99657
+allocate cache entries hugepage of size 3986280
+[STATUS]: map huge page
+allocated HUGEPAGE at 125600142458880 with buffer size 3986280
+1 device(s) found
+Selected device: ibp86s0
+pairing: 225 -- 224
+1 device(s) found
+Selected device: ibp86s0
+pairing: 227 -- 226
+1 device(s) found
+Selected device: ibp86s0
+pairing: 229 -- 228
+1 device(s) found
+Selected device: ibp86s0
+pairing: 231 -- 230
+[DEBUG] Before enable_http check, enable_http=true
+[DEBUG] run_http_service_mode started
+[STATUS]: Running in HTTP service mode
+[DEBUG] Creating HTTP server
+[DEBUG] Starting HTTP server
+[HTTP Server] Starting on 0.0.0.0:8080
+[STATUS]: HTTP server started on 0.0.0.0:8080
+[STATUS]: Starting HTTP service mode

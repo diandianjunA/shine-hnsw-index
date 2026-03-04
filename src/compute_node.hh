@@ -81,4 +81,5 @@ private:
   
   std::unique_ptr<http_server::HttpServer> http_server_;
   std::atomic<node_t> next_http_insert_id_{0};
+  std::atomic<u32> next_worker_id_{0};
 };

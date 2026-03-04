@@ -72,7 +72,7 @@ echo -e "${GREEN}步骤 2: 启动 Compute Node (HTTP Server)${NC}"
 echo "命令: $BUILD_DIR/shine --enable-http --http-host 0.0.0.0 --http-port $HTTP_PORT --servers $MEMORY_SERVER --initiator -t $NUM_THREADS --ef-search $EF_SEARCH -k $K"
 echo "日志: $LOG_DIR/http_server.log"
 
-$BUILD_DIR/shine --enable-http --http-host 0.0.0.0 --http-port $HTTP_PORT --servers $MEMORY_SERVER --initiator -t $NUM_THREADS --ef-search $EF_SEARCH -k $K > "$LOG_DIR/http_server.log" 2>&1 &
+$BUILD_DIR/shine --enable-http --http-host 0.0.0.0 --http-port $HTTP_PORT --servers $MEMORY_SERVER --initiator -t $NUM_THREADS --ef-search $EF_SEARCH -k $K --cache > "$LOG_DIR/http_server.log" 2>&1 &
 HTTP_PID=$!
 echo -e "${GREEN}HTTP Server 已启动 (PID: $HTTP_PID)${NC}"
 

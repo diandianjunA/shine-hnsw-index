@@ -46,6 +46,8 @@ public:
   std::optional<RequestTask> get_next_task();
   void submit_response(std::promise<json>& promise, const json& response);
 
+  static constexpr size_t MAX_QUEUE_SIZE = 10000;
+
 private:
   void setup_routes();
   void handle_insert(const httplib::Request& req, httplib::Response& res);
@@ -62,6 +64,7 @@ private:
   std::queue<RequestTask> task_queue_;
   std::mutex queue_mutex_;
   std::condition_variable queue_cv_;
+  std::atomic<size_t> queue_size_{0};
 };
 
 }  // namespace http_server
