@@ -28,7 +28,7 @@ file(GLOB_RECURSE SOURCES src/*.cc)
 
 # executables
 add_executable(shine ${SOURCES})
-target_link_libraries(shine rdma_library)
+target_link_libraries(shine rdma_library -libverbs)
 target_compile_options(shine PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fcoroutines>)
 
 # status prints
