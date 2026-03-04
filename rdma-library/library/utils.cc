@@ -11,16 +11,7 @@ void lib_failure(const str&& message) {
 std::string get_ip(const str& node_name) {
   std::map<str, str> node_to_ip{
     {"localhost", "127.0.0.1"},
-    {"cluster11", "10.60.50.60"},
-    {"cluster12", "10.60.50.61"},
-    {"cluster13", "10.60.50.62"},
-    {"cluster14", "10.60.50.63"},
-    {"cluster15", "10.60.50.64"},
-    {"cluster16", "10.60.50.65"},
-    {"cluster17", "10.60.50.66"},
-    {"cluster18", "10.60.50.67"},
-    {"cluster19", "10.60.50.68"},
-    {"cluster20", "10.60.50.69"},
+    {"cluster1", "192.168.6.201"},
   };
 
   lib_assert(node_to_ip.find(node_name) != node_to_ip.end(),

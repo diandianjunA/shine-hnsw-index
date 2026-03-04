@@ -13,7 +13,8 @@ HTTP_PORT=8080
 NUM_THREADS=4
 EF_SEARCH=128
 K=10
-MEMORY_SERVER="localhost"
+# MEMORY_SERVER="localhost"
+MEMORY_SERVER="cluster1"
 
 # 颜色输出
 RED='\033[0;31m'
