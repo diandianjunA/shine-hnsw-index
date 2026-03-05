@@ -52,9 +52,11 @@ private:
   void collect_statistics_and_timings();
   void terminate();
   f64 compute_local_recall(const ComputeThreads& compute_threads, u32 k, size_t processed_queries);
-  void run_http_service(hnsw::HNSW<Distance>& hnsw, WorkerPool& worker_pool, u32 num_coroutines, bool pin_threads);
+  void run_http_service(hnsw::HNSW<Distance>& hnsw, WorkerPool& worker_pool, u32 num_coroutines, bool pin_threads, Configuration& config);
   void process_http_insert(const http_server::InsertRequest& req, std::promise<nlohmann::json>& promise, hnsw::HNSW<Distance>& hnsw, WorkerPool& worker_pool, u32 num_coroutines, bool pin_threads);
   void process_http_query(const http_server::QueryRequest& req, std::promise<nlohmann::json>& promise, hnsw::HNSW<Distance>& hnsw, WorkerPool& worker_pool, u32 num_coroutines, bool pin_threads);
+  void process_http_save(std::promise<nlohmann::json>& promise, Configuration& config);
+  void process_http_load(std::promise<nlohmann::json>& promise, Configuration& config);
 
 private:
   Context context_;

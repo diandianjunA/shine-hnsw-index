@@ -22,6 +22,14 @@ void HttpServer::setup_routes() {
     handle_query(req, res);
   });
 
+  server_->Post("/save", [this](const httplib::Request& req, httplib::Response& res) {
+    handle_save(req, res);
+  });
+
+  server_->Post("/load", [this](const httplib::Request& req, httplib::Response& res) {
+    handle_load(req, res);
+  });
+
   server_->Get("/health", [this](const httplib::Request& req, httplib::Response& res) {
     handle_health(req, res);
   });
@@ -116,6 +124,70 @@ void HttpServer::handle_query(const httplib::Request& req, httplib::Response& re
     res.set_content(error.dump(), "application/json");
     res.status = 400;
   }
+}
+
+void HttpServer::handle_save(const httplib::Request& req, httplib::Response& res) {
+  try {
+    json body = json::parse(req.body);
+    SaveRequest save_req;
+    save_req.path = body.contains("path") ? body["path"].get<std::string>() : "";
+
+    RequestTask task;
+    task.type = RequestTask::SAVE;
+    task.save_req = save_req;
+    auto future = task.promise.get_future();
+
+    {
+      std::lock_guard<std::mutex> lock(queue_mutex_);
+      task_queue_.push(std::move(task));
+      queue_size_++;
+    }
+    queue_cv_.notify_one();
+
+    json result = future.get();
+    res.set_content(result.dump(), "application/json");
+    res.status = result["success"] ? 200 : 400;
+  } catch (const std::exception& e) {
+    json error = {{"success", false}, {"error", e.what()}};
+    res.set_content(error.dump(), "application/json");
+    res.status = 400;
+  }
+}
+
+void HttpServer::handle_load(const httplib::Request& req, httplib::Response& res) {
+  try {
+    json body = json::parse(req.body);
+    LoadRequest load_req;
+    load_req.path = body.contains("path") ? body["path"].get<std::string>() : "";
+
+    RequestTask task;
+    task.type = RequestTask::LOAD;
+    task.load_req = load_req;
+    auto future = task.promise.get_future();
+
+    {
+      std::lock_guard<std::mutex> lock(queue_mutex_);
+      task_queue_.push(std::move(task));
+      queue_size_++;
+    }
+    queue_cv_.notify_one();
+
+    json result = future.get();
+    res.set_content(result.dump(), "application/json");
+    res.status = result["success"] ? 200 : 400;
+  } catch (const std::exception& e) {
+    json error = {{"success", false}, {"error", e.what()}};
+    res.set_content(error.dump(), "application/json");
+    res.status = 400;
+  }
+}
+
+void HttpServer::set_save_callback(SaveCallback cb) {
+  save_callback_ = std::move(cb);
+}
+
+void HttpServer::set_load_callback(LoadCallback cb) {
+  load_callback_ = std::move(cb);
 }
 
 void HttpServer::handle_health(const httplib::Request&, httplib::Response& res) {

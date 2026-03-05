@@ -63,6 +63,34 @@ class HnswClient:
             return response.json()
         except requests.exceptions.RequestException as e:
             return {"success": False, "error": str(e)}
+    
+    def save_index(self, path: str = "") -> Dict[str, Any]:
+        """保存索引到文件"""
+        payload = {"path": path}
+        
+        try:
+            response = requests.post(
+                f"{self.base_url}/save",
+                json=payload,
+                timeout=60
+            )
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            return {"success": False, "error": str(e)}
+    
+    def load_index(self, path: str = "") -> Dict[str, Any]:
+        """从文件加载索引"""
+        payload = {"path": path}
+        
+        try:
+            response = requests.post(
+                f"{self.base_url}/load",
+                json=payload,
+                timeout=60
+            )
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            return {"success": False, "error": str(e)}
 
 
 def generate_random_vector(dim: int) -> List[float]:

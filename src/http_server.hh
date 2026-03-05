@@ -7,6 +7,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <future>
+#include <functional>
 #include <mutex>
 #include <queue>
 #include <thread>
@@ -26,18 +27,34 @@ struct QueryRequest {
   u32 ef_search;
 };
 
+struct SaveRequest {
+  std::string path;
+};
+
+struct LoadRequest {
+  std::string path;
+};
+
 struct RequestTask {
-  enum Type { INSERT, QUERY };
+  enum Type { INSERT, QUERY, SAVE, LOAD };
   Type type;
   InsertRequest insert_req;
   QueryRequest query_req;
+  SaveRequest save_req;
+  LoadRequest load_req;
   std::promise<json> promise;
 };
 
 class HttpServer {
 public:
+  using SaveCallback = std::function<std::string()>;
+  using LoadCallback = std::function<std::string()>;
+
   HttpServer(const std::string& host, int port);
   ~HttpServer();
+
+  void set_save_callback(SaveCallback cb);
+  void set_load_callback(LoadCallback cb);
 
   void start();
   void stop();
@@ -52,6 +69,8 @@ private:
   void setup_routes();
   void handle_insert(const httplib::Request& req, httplib::Response& res);
   void handle_query(const httplib::Request& req, httplib::Response& res);
+  void handle_save(const httplib::Request& req, httplib::Response& res);
+  void handle_load(const httplib::Request& req, httplib::Response& res);
   void handle_health(const httplib::Request& req, httplib::Response& res);
   void handle_info(const httplib::Request& req, httplib::Response& res);
 
@@ -60,6 +79,9 @@ private:
   std::unique_ptr<httplib::Server> server_;
   std::thread server_thread_;
   std::atomic<bool> running_{false};
+
+  SaveCallback save_callback_;
+  LoadCallback load_callback_;
 
   std::queue<RequestTask> task_queue_;
   std::mutex queue_mutex_;
