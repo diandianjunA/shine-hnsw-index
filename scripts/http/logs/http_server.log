@@ -1,7 +1,7 @@
 ============================================================
                         CLIENT
 ============================================================
-connect to:                   [cluster1, ]
+connect to:                   [localhost, ]
 is initiator:                 true
 TCP port:                     1234
 IB port:                      1
@@ -27,33 +27,33 @@ num_cores: 112
 physical cores per socket: 28
 hyperthreading enabled
 interleaved policy
-[DEBUG] ComputeNode HTTP impl constructor started, enable_http=true
+[DEBUG] ComputeNode constructor started, enable_http=true
 client id: 0
 number of clients: 1
-connect to server cluster1
-pairing: 233 -- 40
+connect to server localhost
+pairing: 316 -- 315
 [STATUS]: pinned main thread to core 28
 [STATUS]: receive access tokens of remote memory regions
 [STATUS]: max cache size: 52619353
 [STATUS]: allocate worker threads and read buffers
 [STATUS]: map huge page
-allocated HUGEPAGE at 133691395276800 with buffer size 10737418240
+allocated HUGEPAGE at 135613730783232 with buffer size 10737418240
 num cache buckets: 99657
 allocate cache entries hugepage of size 3986280
 [STATUS]: map huge page
-allocated HUGEPAGE at 133691386888192 with buffer size 3986280
+allocated HUGEPAGE at 135613722394624 with buffer size 3986280
 1 device(s) found
 Selected device: ibp86s0
-pairing: 234 -- 41
+pairing: 318 -- 317
 1 device(s) found
 Selected device: ibp86s0
-pairing: 235 -- 42
+pairing: 320 -- 319
 1 device(s) found
 Selected device: ibp86s0
-pairing: 236 -- 43
+pairing: 322 -- 321
 1 device(s) found
 Selected device: ibp86s0
-pairing: 237 -- 44
+pairing: 324 -- 323
 [DEBUG] Before enable_http check, enable_http=true
 [DEBUG] run_http_service_mode started
 [STATUS]: Running in HTTP service mode
@@ -62,3 +62,6 @@ pairing: 237 -- 44
 [HTTP Server] Starting on 0.0.0.0:8080
 [STATUS]: HTTP server started on 0.0.0.0:8080
 [STATUS]: Starting HTTP service mode
+[HTTP] Save index requested
+[HTTP] Load index requested
+Send request failed

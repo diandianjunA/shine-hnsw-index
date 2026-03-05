@@ -9,7 +9,7 @@ using json = nlohmann::json;
 template <class Distance>
 ComputeNode<Distance>::ComputeNode(Configuration& config)
     : context_(config), cm_(context_, config), num_servers_(config.num_server_nodes()) {
-  std::cerr << "[DEBUG] ComputeNode HTTP impl constructor started, enable_http=" << config.enable_http << std::endl;
+  std::cerr << "[DEBUG] ComputeNode constructor started, enable_http=" << config.enable_http << std::endl;
   init_remote_tokens();
   cm_.connect();
 
@@ -20,7 +20,7 @@ ComputeNode<Distance>::ComputeNode(Configuration& config)
   }
 
   if (cm_.is_initiator) {  // communicate parameters to the memory nodes
-    configuration::Parameters p{config.num_threads, config.enable_http ? false : config.use_cache, config.routing};
+    configuration::Parameters p{config.num_threads, config.use_cache, config.routing};
 
     for (const QP& qp : cm_.server_qps) {
       qp->post_send_inlined(&p, sizeof(configuration::Parameters), IBV_WR_SEND);
@@ -239,7 +239,7 @@ void ComputeNode<Distance>::run_http_service_mode(Configuration& config,
     }
     
     // Run the HTTP service loop
-    run_http_service(hnsw, worker_pool, config.num_coroutines, !config.disable_thread_pinning);
+    run_http_service(hnsw, worker_pool, config.num_coroutines, !config.disable_thread_pinning, config);
     
     // Cleanup
     http_server_->stop();
@@ -677,7 +677,8 @@ template <class Distance>
 void ComputeNode<Distance>::run_http_service(hnsw::HNSW<Distance>& hnsw,
                                              WorkerPool& worker_pool,
                                              u32 num_coroutines,
-                                             bool pin_threads) {
+                                             bool pin_threads,
+                                             Configuration& config) {
   print_status("Starting HTTP service mode");
   
   while (http_server_->is_running()) {
@@ -691,6 +692,10 @@ void ComputeNode<Distance>::run_http_service(hnsw::HNSW<Distance>& hnsw,
       process_http_insert(task.insert_req, task.promise, hnsw, worker_pool, num_coroutines, pin_threads);
     } else if (task.type == http_server::RequestTask::QUERY) {
       process_http_query(task.query_req, task.promise, hnsw, worker_pool, num_coroutines, pin_threads);
+    } else if (task.type == http_server::RequestTask::SAVE) {
+      process_http_save(task.promise, config);
+    } else if (task.type == http_server::RequestTask::LOAD) {
+      process_http_load(task.promise, config);
     }
   }
   
@@ -808,6 +813,128 @@ void ComputeNode<Distance>::process_http_query(const http_server::QueryRequest& 
       {"results", results},
       {"k", req.k},
       {"ef_search", req.ef_search}
+    };
+    http_server_->submit_response(promise, response);
+  } catch (const std::exception& e) {
+    json response = {
+      {"success", false},
+      {"error", e.what()}
+    };
+    http_server_->submit_response(promise, response);
+  }
+}
+
+template <class Distance>
+void ComputeNode<Distance>::process_http_save(std::promise<nlohmann::json>& promise, Configuration& config) {
+  try {
+    if (!cm_.is_initiator) {
+      json response = {
+        {"success", false},
+        {"error", "Only initiator can save index"}
+      };
+      http_server_->submit_response(promise, response);
+      return;
+    }
+
+    std::cerr << "[HTTP] Save index requested" << std::endl;
+    
+    const size_t num_memory_servers = cm_.server_qps.size();
+
+    struct Message {
+      bool load;
+      size_t path_length;
+    };
+
+    filepath_t saved_path;
+
+    for (idx_t i = 0; i < num_memory_servers; ++i) {
+      filepath_t path = config.data_path;
+      path /= "dump/index_m" + std::to_string(config.m) + "_efc" + std::to_string(config.ef_construction) + "_node" +
+              std::to_string(i + 1) + "_of" + std::to_string(num_memory_servers) + ".dat";
+      
+      if (i == 0) {
+        saved_path = path;
+      }
+
+      const Message msg{false, path.string().size()};
+      const QP& qp = cm_.server_qps[i];
+
+      qp->post_send_inlined(&msg, sizeof(Message), IBV_WR_SEND);
+      qp->post_send_inlined(path.string().data(), path.string().size(), IBV_WR_SEND);
+    }
+
+    context_.poll_send_cq_until_completion(static_cast<i32>(2 * num_memory_servers));
+
+    const bool success = cm_.synchronize();
+    if (!success) {
+      throw std::runtime_error("Index saving failed");
+    }
+    
+    json response = {
+      {"success", true},
+      {"message", "Index saved successfully"},
+      {"path", saved_path.string()}
+    };
+    http_server_->submit_response(promise, response);
+  } catch (const std::exception& e) {
+    json response = {
+      {"success", false},
+      {"error", e.what()}
+    };
+    http_server_->submit_response(promise, response);
+  }
+}
+
+template <class Distance>
+void ComputeNode<Distance>::process_http_load(std::promise<nlohmann::json>& promise, Configuration& config) {
+  try {
+    if (!cm_.is_initiator) {
+      json response = {
+        {"success", false},
+        {"error", "Only initiator can load index"}
+      };
+      http_server_->submit_response(promise, response);
+      return;
+    }
+
+    std::cerr << "[HTTP] Load index requested" << std::endl;
+    
+    const size_t num_memory_servers = cm_.server_qps.size();
+
+    struct Message {
+      bool load;
+      size_t path_length;
+    };
+
+    filepath_t loaded_path;
+
+    for (idx_t i = 0; i < num_memory_servers; ++i) {
+      filepath_t path = config.data_path;
+      path /= "dump/index_m" + std::to_string(config.m) + "_efc" + std::to_string(config.ef_construction) + "_node" +
+              std::to_string(i + 1) + "_of" + std::to_string(num_memory_servers) + ".dat";
+      
+      if (i == 0) {
+        loaded_path = path;
+      }
+
+      const Message msg{true, path.string().size()};
+      const QP& qp = cm_.server_qps[i];
+
+      qp->post_send_inlined(&msg, sizeof(Message), IBV_WR_SEND);
+      qp->post_send_inlined(path.string().data(), path.string().size(), IBV_WR_SEND);
+    }
+
+    context_.poll_send_cq_until_completion(static_cast<i32>(2 * num_memory_servers));
+
+    const bool success = cm_.synchronize();
+    if (!success) {
+      throw std::runtime_error("Index loading failed");
+    }
+    
+    json response = {
+      {"success", true},
+      {"message", "Index loaded successfully"},
+      {"path", loaded_path.string()}
     };
     http_server_->submit_response(promise, response);
   } catch (const std::exception& e) {
