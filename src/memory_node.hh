@@ -364,16 +364,82 @@ private:
   void idle() {
     print_status("idle: queries");
 
-    // dummy region
-    bool done;
-    LocalMemoryRegion region{context_, &done, sizeof(bool)};
+    struct Message {
+      bool load;
+      size_t path_length;
+    } msg{};
 
-    for (const QP& qp : cm_.client_qps) {
-      qp->post_receive(region);
+    LocalMemoryRegion region{context_, &msg, sizeof(Message)};
+    cm_.initiator_qp->post_receive(region);
+    context_.receive();
+
+    if (msg.path_length > 0) {
+      str path;
+      path.resize(msg.path_length);
+
+      LocalMemoryRegion path_region{context_, path.data(), msg.path_length};
+      cm_.initiator_qp->post_receive(path_region);
+      context_.receive();
+
+      if (msg.load) {
+        std::ifstream file{path, std::ios::binary};
+
+        if (!file.good()) {
+          bool ready = false;
+          cm_.initiator_qp->post_send_inlined(&ready, sizeof(bool), IBV_WR_SEND);
+          context_.poll_send_cq_until_completion();
+          lib_failure("file \"" + path + "\" does not exist");
+        }
+
+        file.unsetf(std::ios::skipws);
+        size_t file_size;
+
+        file.seekg(0, std::ios::end);
+        file_size = file.tellg();
+        file.seekg(0, std::ios::beg);
+
+        if (file_size > index_buffer_.buffer_size) {
+          bool ready = false;
+          cm_.initiator_qp->post_send_inlined(&ready, sizeof(bool), IBV_WR_SEND);
+          context_.poll_send_cq_until_completion();
+          lib_failure("cannot load index (buffer too small)");
+        }
+
+        print_status("runtime: loading index (" + std::to_string(file_size) + " Bytes) from " + path);
+        auto t_read = timing_.create_enroll("read_index_buffer_runtime");
+
+        t_read->start();
+        file.read(reinterpret_cast<char*>(index_buffer_.get_full_buffer()), file_size);
+        t_read->stop();
+
+      } else {
+        const auto t_store = timing_.create_enroll("store_index_buffer_runtime");
+        const size_t index_size = *reinterpret_cast<u64*>(index_buffer_.get_full_buffer());
+
+        print_status("runtime: storing index (" + std::to_string(index_size) + " Bytes) to " + path);
+
+        create_directory(filepath_t{path}.parent_path());
+        std::ofstream output_s{path, std::ios::out | std::ios::binary};
+
+        t_store->start();
+        if (!output_s.write(reinterpret_cast<char*>(index_buffer_.get_full_buffer()), index_size)) {
+          lib_failure("Cannot write to file");
+        }
+        t_store->stop();
+
+        output_s.close();
+      }
+
+      bool ready = true;
+      cm_.initiator_qp->post_send_inlined(&ready, sizeof(bool), IBV_WR_SEND);
+      context_.poll_send_cq_until_completion();
+
+    } else {
+      for (const QP& qp : cm_.client_qps) {
+        qp->post_receive(region);
+      }
+      context_.receive(num_clients_);
     }
-
-    // wait
-    context_.receive(num_clients_);
   }
 
 private:
