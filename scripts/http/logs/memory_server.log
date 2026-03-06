@@ -14,19 +14,21 @@ num_cores: 112
 physical cores per socket: 28
 hyperthreading enabled
 interleaved policy
-pairing: 315 -- 316
+pairing: 325 -- 326
 [STATUS]: pinned main thread to core 28
 allocation size: 42949672960
 [STATUS]: map huge page
-allocated HUGEPAGE at 128950198075392 with buffer size 42949672960
+allocated HUGEPAGE at 128731024719872 with buffer size 42949672960
 [STATUS]: register memory and distribute access token
 [STATUS]: connect QPs of compute threads
-pairing: 317 -- 318
-pairing: 319 -- 320
-pairing: 321 -- 322
-pairing: 323 -- 324
+pairing: 327 -- 328
+pairing: 329 -- 330
+pairing: 331 -- 332
+pairing: 333 -- 334
 [STATUS]: idle: index construction
 [STATUS]: storing index (52928 Bytes) to dump/index_m32_efc200_node1_of1.dat
 [STATUS]: cache warmup
 [STATUS]: idle: queries
-Receive request failed
+[STATUS]: runtime: loading index (52928 Bytes) from dump/index_m32_efc200_node1_of1.dat
+[STATUS]: query processing
+[STATUS]: idle: queries
