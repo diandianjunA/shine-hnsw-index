@@ -12,6 +12,7 @@ std::string get_ip(const str& node_name) {
   std::map<str, str> node_to_ip{
     {"localhost", "127.0.0.1"},
     {"cluster1", "192.168.6.201"},
+    {"cluster2", "192.168.6.202"},
   };
 
   lib_assert(node_to_ip.find(node_name) != node_to_ip.end(),
