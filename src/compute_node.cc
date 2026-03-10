@@ -693,9 +693,9 @@ void ComputeNode<Distance>::run_http_service(hnsw::HNSW<Distance>& hnsw,
     } else if (task.type == http_server::RequestTask::QUERY) {
       process_http_query(task.query_req, task.promise, hnsw, worker_pool, num_coroutines, pin_threads);
     } else if (task.type == http_server::RequestTask::SAVE) {
-      process_http_save(task.promise, config);
+      process_http_save(task.promise, task.save_req, config);
     } else if (task.type == http_server::RequestTask::LOAD) {
-      process_http_load(task.promise, config);
+      process_http_load(task.promise, task.load_req, config);
     }
   }
   
@@ -825,7 +825,9 @@ void ComputeNode<Distance>::process_http_query(const http_server::QueryRequest& 
 }
 
 template <class Distance>
-void ComputeNode<Distance>::process_http_save(std::promise<nlohmann::json>& promise, Configuration& config) {
+void ComputeNode<Distance>::process_http_save(std::promise<nlohmann::json>& promise, 
+                                               const http_server::SaveRequest& req, 
+                                               Configuration& config) {
   try {
     if (!cm_.is_initiator) {
       json response = {
@@ -840,6 +842,11 @@ void ComputeNode<Distance>::process_http_save(std::promise<nlohmann::json>& prom
     
     const size_t num_memory_servers = cm_.server_qps.size();
 
+    filepath_t base_path = config.data_path;
+    if (!req.path.empty()) {
+      base_path = filepath_t(req.path);
+    }
+
     struct Message {
       bool load;
       size_t path_length;
@@ -848,7 +855,7 @@ void ComputeNode<Distance>::process_http_save(std::promise<nlohmann::json>& prom
     filepath_t saved_path;
 
     for (idx_t i = 0; i < num_memory_servers; ++i) {
-      filepath_t path = config.data_path;
+      filepath_t path = base_path;
       path /= "dump/index_m" + std::to_string(config.m) + "_efc" + std::to_string(config.ef_construction) + "_node" +
               std::to_string(i + 1) + "_of" + std::to_string(num_memory_servers) + ".dat";
       
@@ -886,7 +893,9 @@ void ComputeNode<Distance>::process_http_save(std::promise<nlohmann::json>& prom
 }
 
 template <class Distance>
-void ComputeNode<Distance>::process_http_load(std::promise<nlohmann::json>& promise, Configuration& config) {
+void ComputeNode<Distance>::process_http_load(std::promise<nlohmann::json>& promise, 
+                                               const http_server::LoadRequest& req, 
+                                               Configuration& config) {
   try {
     if (!cm_.is_initiator) {
       json response = {
@@ -901,6 +910,11 @@ void ComputeNode<Distance>::process_http_load(std::promise<nlohmann::json>& prom
     
     const size_t num_memory_servers = cm_.server_qps.size();
 
+    filepath_t base_path = config.data_path;
+    if (!req.path.empty()) {
+      base_path = filepath_t(req.path);
+    }
+
     struct Message {
       bool load;
       size_t path_length;
@@ -909,7 +923,7 @@ void ComputeNode<Distance>::process_http_load(std::promise<nlohmann::json>& prom
     filepath_t loaded_path;
 
     for (idx_t i = 0; i < num_memory_servers; ++i) {
-      filepath_t path = config.data_path;
+      filepath_t path = base_path;
       path /= "dump/index_m" + std::to_string(config.m) + "_efc" + std::to_string(config.ef_construction) + "_node" +
               std::to_string(i + 1) + "_of" + std::to_string(num_memory_servers) + ".dat";
       

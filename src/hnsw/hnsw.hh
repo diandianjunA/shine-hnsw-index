@@ -193,7 +193,6 @@ public:
         if (neighborlist->num_neighbors() < m_max) {
           neighborlist->add(new_node_ptr);
           co_await rdma::write_last_neighbor_in_neighborlist(neighborlist, neighbor, thread);
-
         } else {
           // read neighbor's neighbors
           vec<s_ptr<Node>> old_neighbors = co_await rdma::read_nodes(neighborlist->view(), thread);
